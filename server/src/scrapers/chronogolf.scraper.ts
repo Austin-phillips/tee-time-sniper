@@ -108,7 +108,7 @@ export class ChronogolfScraper extends BaseScraper {
         dateTime,
         numPlayersAvailable: 4,
         price,
-        bookingUrl: courseUrl,
+        bookingUrl: `${courseUrl}#?date=${item.date}&course_id=${item.course_id}&nb_holes=18`,
         platform: 'chronogolf',
       });
     }

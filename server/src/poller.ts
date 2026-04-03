@@ -155,20 +155,21 @@ export async function pollForTeeTimesOnce(): Promise<void> {
       }
 
       const existing = await getMatchedTeeTimes(pref.id);
+      const normalizeTime = (t: string | Date) => new Date(t).toISOString();
       const existingByTeeTime = new Map(
-        existing.map((row) => [row.tee_time, row])
+        existing.map((row) => [normalizeTime(row.tee_time), row])
       );
 
       const scrapedTeeTimeSet = new Set(
-        matchingSlots.map((s) => s.dateTime.toISOString())
+        matchingSlots.map((s) => normalizeTime(s.dateTime))
       );
 
       const newSlots = matchingSlots.filter(
-        (s) => !existingByTeeTime.has(s.dateTime.toISOString())
+        (s) => !existingByTeeTime.has(normalizeTime(s.dateTime))
       );
 
       const staleIds = existing
-        .filter((row) => !scrapedTeeTimeSet.has(row.tee_time))
+        .filter((row) => !scrapedTeeTimeSet.has(normalizeTime(row.tee_time)))
         .map((row) => row.id);
 
       if (newSlots.length > 0) {

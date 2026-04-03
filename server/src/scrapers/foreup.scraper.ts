@@ -71,12 +71,14 @@ export class ForeupScraper extends BaseScraper {
           const available = item.available_spots ?? item.available_spots_18 ?? 0;
           if (available < numPlayers) continue;
 
+          const teeDateTime = new Date(item.time);
+          const bookingDate = this.formatDate(teeDateTime);
           slots.push({
             courseId: courseId,
-            dateTime: new Date(item.time),
+            dateTime: teeDateTime,
             numPlayersAvailable: available,
             price: item.green_fee_18 ?? item.green_fee ?? 0,
-            bookingUrl: `${baseUrl}/index.php/booking/${courseId}/${scheduleId}`,
+            bookingUrl: `${baseUrl}/index.php/booking/${courseId}/${scheduleId}#/teetimes?date=${bookingDate}&time=all&holes=18&players=${numPlayers}`,
             platform: 'foreup',
           });
         }
