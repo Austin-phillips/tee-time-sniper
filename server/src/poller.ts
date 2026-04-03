@@ -15,6 +15,8 @@ import { ChronogolfScraper } from './scrapers/chronogolf.scraper';
 import { CustomScraper } from './scrapers/custom.scraper';
 import { TeeTimeSlot, Course, Preference } from './types';
 
+const COURSE_CONCURRENCY = 5;
+
 function getScraperForPlatform(platform: string): BaseScraper {
   switch (platform) {
     case 'foreup': return new ForeupScraper();
@@ -32,6 +34,26 @@ function isTimeInWindow(dateTime: Date, earliest: string, latest: string): boole
 
 function isDayMatch(dateTime: Date, daysOfWeek: number[]): boolean {
   return daysOfWeek.includes(dateTime.getDay());
+}
+
+/** Run async tasks with a concurrency limit */
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number
+): Promise<T[]> {
+  const results: T[] = [];
+  let index = 0;
+
+  async function runNext(): Promise<void> {
+    while (index < tasks.length) {
+      const i = index++;
+      results[i] = await tasks[i]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => runNext());
+  await Promise.all(workers);
+  return results;
 }
 
 export async function pollForTeeTimesOnce(): Promise<void> {
@@ -56,18 +78,18 @@ export async function pollForTeeTimesOnce(): Promise<void> {
   const courses = await getCoursesByIds(courseIds);
   const courseMap = new Map<string, Course>(courses.map((c) => [c.id, c]));
 
-  // 4. Scrape each unique course ONCE
+  // 4. Scrape courses in parallel (max COURSE_CONCURRENCY at a time)
   const slotsByCourse = new Map<string, TeeTimeSlot[]>();
+  const courseEntries = [...prefsByCourse.entries()];
 
-  for (const [courseId, coursePrefs] of prefsByCourse) {
+  const scrapeTasks = courseEntries.map(([courseId, coursePrefs]) => async () => {
     const course = courseMap.get(courseId);
     if (!course) {
       console.error(`Course ${courseId} not found, skipping`);
-      continue;
+      return;
     }
 
     try {
-      // Compute widest scrape window across all preferences for this course
       const minPlayers = Math.min(...coursePrefs.map((p) => p.num_players));
       const maxLookAhead = Math.max(...coursePrefs.map((p) => p.look_ahead_days));
 
@@ -83,7 +105,6 @@ export async function pollForTeeTimesOnce(): Promise<void> {
         course.scraper_config
       );
 
-      // Tag slots with the Supabase course ID
       slotsByCourse.set(
         courseId,
         slots.map((s) => ({ ...s, courseId: course.id }))
@@ -104,13 +125,13 @@ export async function pollForTeeTimesOnce(): Promise<void> {
     } catch (err) {
       console.error(`Error scraping course ${course.name}:`, err);
     }
-  }
+  });
+
+  await runWithConcurrency(scrapeTasks, COURSE_CONCURRENCY);
 
   // 5. For each preference, filter slots and diff against matched_tee_times
-  // Track new matches per (userId, courseId) for batch notifications
   const newMatchesByUserCourse = new Map<string, { courseName: string; count: number }>();
 
-  // First, prune any tee times that are in the past
   await deleteStaleTeeTimes();
 
   for (const pref of preferences) {
@@ -120,7 +141,6 @@ export async function pollForTeeTimesOnce(): Promise<void> {
 
       const allSlots = slotsByCourse.get(pref.course_id) ?? [];
 
-      // 5a. Filter scraped slots for this preference
       const matchingSlots = allSlots.filter(
         (slot) =>
           slot.numPlayersAvailable >= pref.num_players &&
@@ -134,28 +154,23 @@ export async function pollForTeeTimesOnce(): Promise<void> {
         console.log(`  Preference ${pref.id} (${course.name}): no slots match filters (days=${JSON.stringify(pref.days_of_week)}, time=${pref.earliest_time}-${pref.latest_time}, players=${pref.num_players})`);
       }
 
-      // 5b. Fetch existing matched_tee_times for this preference
       const existing = await getMatchedTeeTimes(pref.id);
       const existingByTeeTime = new Map(
         existing.map((row) => [row.tee_time, row])
       );
 
-      // 5c. Compute diff
       const scrapedTeeTimeSet = new Set(
         matchingSlots.map((s) => s.dateTime.toISOString())
       );
 
-      // NEW = in scraped but not in existing
       const newSlots = matchingSlots.filter(
         (s) => !existingByTeeTime.has(s.dateTime.toISOString())
       );
 
-      // STALE = in existing but not in scraped
       const staleIds = existing
         .filter((row) => !scrapedTeeTimeSet.has(row.tee_time))
         .map((row) => row.id);
 
-      // 5d. Insert new rows
       if (newSlots.length > 0) {
         console.log(`    ${newSlots.length} NEW tee times for ${course.name}:`);
         for (const slot of newSlots) {
@@ -177,13 +192,11 @@ export async function pollForTeeTimesOnce(): Promise<void> {
         await insertMatchedTeeTimes(rows);
       }
 
-      // 5e. Delete stale rows
       if (staleIds.length > 0) {
         console.log(`    ${staleIds.length} stale tee times removed for ${course.name}`);
         await deleteMatchedTeeTimes(staleIds);
       }
 
-      // 5f. Track for notification batching
       if (newSlots.length > 0) {
         const key = `${pref.user_id}:${pref.course_id}`;
         const prev = newMatchesByUserCourse.get(key);

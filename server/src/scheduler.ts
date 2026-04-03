@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { pollForTeeTimesOnce } from './poller';
 
-const POLL_INTERVAL = process.env.POLL_CRON ?? '* * * * *'; // Every minute
+const POLL_INTERVAL = process.env.POLL_CRON ?? '*/5 * * * *'; // Every 5 minutes
 
 export function startScheduler(): void {
   console.log(`Starting scheduler with cron: ${POLL_INTERVAL}`);
