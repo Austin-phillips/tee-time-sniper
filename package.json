@@ -1,0 +1,10 @@
+{
+  "name": "tee-time-sniper",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "db:new": "supabase migration new",
+    "db:push": "supabase db push",
+    "db:status": "supabase migration list"
+  }
+}

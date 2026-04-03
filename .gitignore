@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# Server
+server/node_modules/
+server/dist/
+
+# Mobile (Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/dist/
+
+# Web (legacy)
+web/.next/
+web/node_modules/
+
+# Supabase
+supabase/.temp/
+
+# OS
+.DS_Store
