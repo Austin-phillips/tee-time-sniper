@@ -109,9 +109,9 @@ export function PreferenceForm({
       result = await supabase.from("preferences").insert(payload);
     }
 
+    setLoading(false);
     if (result.error) {
       setError(result.error.message);
-      setLoading(false);
     } else {
       router.replace("/(app)/dashboard");
     }

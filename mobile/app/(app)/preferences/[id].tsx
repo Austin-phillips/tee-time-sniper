@@ -58,6 +58,7 @@ export default function EditPreferenceScreen() {
 
   return (
     <PreferenceForm
+      key={id}
       courses={courses}
       initial={preference}
       userId={user!.id}
