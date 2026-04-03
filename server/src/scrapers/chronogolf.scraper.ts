@@ -1,4 +1,3 @@
-import { ProxyAgent } from 'undici';
 import { BaseScraper } from './base.scraper';
 import { TeeTimeSlot, DateRange } from '../types';
 
@@ -12,25 +11,17 @@ import { TeeTimeSlot, DateRange } from '../types';
  * Club metadata (clubId, affiliationTypeId) is extracted from the __NEXT_DATA__
  * script tag on the club page, or from scraper_config if provided.
  *
- * Requests are routed through PROXY_URL if set (Cloudflare blocks datacenter IPs).
- * All dates are fetched in parallel for speed.
+ * Dates are fetched sequentially with random delays to avoid detection.
  */
 export class ChronogolfScraper extends BaseScraper {
-  private dispatcher: ProxyAgent | undefined;
-
   constructor() {
     super('chronogolf');
-    const proxyUrl = process.env.PROXY_URL;
-    if (proxyUrl) {
-      this.dispatcher = new ProxyAgent(proxyUrl);
-    }
   }
 
-  private async proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  private async fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
     return fetch(url, {
       ...options,
       signal: AbortSignal.timeout(15000),
-      ...(this.dispatcher ? { dispatcher: this.dispatcher as any } : {}),
     });
   }
 
@@ -50,24 +41,22 @@ export class ChronogolfScraper extends BaseScraper {
       affiliationTypeId = meta.affiliationTypeId;
     }
 
-    // Build list of dates to fetch
-    const dates: string[] = [];
-    const currentDate = new Date(dateRange.start);
-    while (currentDate <= dateRange.end) {
-      dates.push(this.formatDate(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    // Fetch all dates in parallel
-    const results = await Promise.allSettled(
-      dates.map((dateStr) => this.fetchDate(clubId!, affiliationTypeId!, dateStr, courseUrl))
-    );
-
+    // Fetch dates sequentially with random delays to look like normal browsing
     const slots: TeeTimeSlot[] = [];
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        slots.push(...result.value);
+    const currentDate = new Date(dateRange.start);
+
+    while (currentDate <= dateRange.end) {
+      const dateStr = this.formatDate(currentDate);
+      try {
+        const daySlots = await this.fetchDate(clubId!, affiliationTypeId!, dateStr, courseUrl);
+        slots.push(...daySlots);
+      } catch (err) {
+        console.error(`Error fetching Chronogolf slots for ${dateStr}:`, err);
       }
+      currentDate.setDate(currentDate.getDate() + 1);
+
+      // Random delay 500-1500ms between requests
+      await this.sleep(500 + Math.random() * 1000);
     }
 
     return slots;
@@ -86,7 +75,7 @@ export class ChronogolfScraper extends BaseScraper {
 
     const url = `https://www.chronogolf.com/marketplace/clubs/${clubId}/teetimes?${params}`;
 
-    const response = await this.proxyFetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       headers: {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.9',
@@ -134,7 +123,7 @@ export class ChronogolfScraper extends BaseScraper {
   }
 
   private async fetchClubMetadata(slug: string): Promise<{ clubId: number; affiliationTypeId: number }> {
-    const response = await this.proxyFetch(`https://www.chronogolf.com/club/${slug}`, {
+    const response = await this.fetchWithTimeout(`https://www.chronogolf.com/club/${slug}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       },
@@ -160,6 +149,10 @@ export class ChronogolfScraper extends BaseScraper {
       clubId: club.id,
       affiliationTypeId: club.defaultAffiliationTypeId,
     };
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private formatDate(date: Date): string {

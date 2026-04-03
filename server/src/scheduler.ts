@@ -1,7 +1,8 @@
 import cron from 'node-cron';
 import { pollForTeeTimesOnce } from './poller';
 
-const POLL_INTERVAL = process.env.POLL_CRON ?? '*/5 * * * *'; // Every 5 minutes
+// Every 5 minutes, 5am–1am Mountain Time (UTC offset: 5am MT = 11 UTC, 1am MT = 7 UTC)
+const POLL_INTERVAL = process.env.POLL_CRON ?? '*/5 5-23,0 * * *';
 
 export function startScheduler(): void {
   console.log(`Starting scheduler with cron: ${POLL_INTERVAL}`);
