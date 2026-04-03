@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import * as Linking from "expo-linking";
+import { Linking } from "react-native";
 import * as Notifications from "expo-notifications";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
