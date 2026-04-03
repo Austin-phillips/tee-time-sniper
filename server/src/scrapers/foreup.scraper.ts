@@ -24,9 +24,15 @@ export class ForeupScraper extends BaseScraper {
   ): Promise<TeeTimeSlot[]> {
     const slots: TeeTimeSlot[] = [];
     const baseUrl = this.extractBaseUrl(courseUrl);
-    const scheduleId = (scraperConfig?.schedule_id as string) ?? '1';
-    const courseId = (scraperConfig?.course_id as string) ?? '';
-    const bookingClass = (scraperConfig?.booking_class as string) ?? 'false';
+    const urlParts = this.parseBookingUrl(courseUrl);
+    const courseId = (scraperConfig?.course_id as string) ?? urlParts.courseId ?? '';
+    const scheduleId = (scraperConfig?.schedule_id as string) ?? urlParts.scheduleId ?? '1';
+
+    // Auto-detect booking class if not provided
+    let bookingClass = scraperConfig?.booking_class as string | undefined;
+    if (!bookingClass) {
+      bookingClass = await this.fetchDefaultBookingClass(baseUrl, courseId, scheduleId);
+    }
 
     const currentDate = new Date(dateRange.start);
     while (currentDate <= dateRange.end) {
@@ -95,6 +101,39 @@ export class ForeupScraper extends BaseScraper {
   private extractBaseUrl(courseUrl: string): string {
     const url = new URL(courseUrl);
     return `${url.protocol}//${url.host}`;
+  }
+
+  /** Fetch the booking page and extract the first active booking class ID */
+  private async fetchDefaultBookingClass(baseUrl: string, courseId: string, scheduleId: string): Promise<string> {
+    try {
+      const response = await fetch(`${baseUrl}/index.php/booking/${courseId}/${scheduleId}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      });
+      if (!response.ok) return 'false';
+
+      const html = await response.text();
+      const match = html.match(/"booking_classes":\[([^\]]*)\]/);
+      if (!match) return 'false';
+
+      const classes = JSON.parse(`[${match[1]}]`) as { booking_class_id: string; active: string; block_online_booking: string }[];
+      const active = classes.find((c) => c.active === '1' && c.block_online_booking === '0');
+      if (active) {
+        console.log(`  Auto-detected booking_class=${active.booking_class_id} for course ${courseId}`);
+        return active.booking_class_id;
+      }
+    } catch (err) {
+      console.warn(`Failed to auto-detect booking class for course ${courseId}:`, err);
+    }
+    return 'false';
+  }
+
+  /** Parse /index.php/booking/{courseId}/{scheduleId} from the booking URL */
+  private parseBookingUrl(courseUrl: string): { courseId?: string; scheduleId?: string } {
+    const match = courseUrl.match(/\/booking\/(\d+)\/(\d+)/);
+    if (!match) return {};
+    return { courseId: match[1], scheduleId: match[2] };
   }
 
   /** foreUP expects M-D-YYYY (no zero-padding) */
