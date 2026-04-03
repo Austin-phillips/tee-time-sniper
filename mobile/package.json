@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:dev": "eas build --profile development --platform ios",
-    "build:preview": "eas build --profile preview --platform ios",
+    "build:preview": "eas build --profile preview --platform ios --clear-cache",
     "build:prod": "eas build --profile production --platform ios"
   },
   "dependencies": {
