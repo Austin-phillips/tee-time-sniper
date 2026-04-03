@@ -117,7 +117,7 @@ export async function pollForTeeTimesOnce(): Promise<void> {
           const day = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const time = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           const price = slot.price > 0 ? ` | $${slot.price}` : '';
-          console.log(`    ${day} at ${time} — ${slot.numPlayersAvailable} players${price}`);
+          console.log(`    ${day} at ${time} — ${slot.numPlayersAvailable} players | ${slot.holes}h${price}`);
         }
       } else {
         console.log(`  ${course.name}: no available tee times found`);
@@ -141,12 +141,29 @@ export async function pollForTeeTimesOnce(): Promise<void> {
 
       const allSlots = slotsByCourse.get(pref.course_id) ?? [];
 
-      const matchingSlots = allSlots.filter(
+      const filteredSlots = allSlots.filter(
         (slot) =>
           slot.numPlayersAvailable >= pref.num_players &&
           isDayMatch(slot.dateTime, pref.days_of_week) &&
-          isTimeInWindow(slot.dateTime, pref.earliest_time, pref.latest_time)
+          isTimeInWindow(slot.dateTime, pref.earliest_time, pref.latest_time) &&
+          (pref.holes === 0 || slot.holes === pref.holes)
       );
+
+      // For "both" (holes=0), deduplicate by tee_time — prefer 18-hole over 9-hole
+      let matchingSlots: TeeTimeSlot[];
+      if (pref.holes === 0) {
+        const byTime = new Map<string, TeeTimeSlot>();
+        for (const slot of filteredSlots) {
+          const key = slot.dateTime.toISOString();
+          const existing = byTime.get(key);
+          if (!existing || slot.holes > existing.holes) {
+            byTime.set(key, slot);
+          }
+        }
+        matchingSlots = [...byTime.values()];
+      } else {
+        matchingSlots = filteredSlots;
+      }
 
       if (matchingSlots.length > 0) {
         console.log(`  Preference ${pref.id} (${course.name}): ${matchingSlots.length} slots match filters`);
@@ -189,6 +206,7 @@ export async function pollForTeeTimesOnce(): Promise<void> {
           players_available: slot.numPlayersAvailable,
           price: slot.price,
           booking_url: slot.bookingUrl,
+          holes: slot.holes,
         }));
         await insertMatchedTeeTimes(rows);
       }

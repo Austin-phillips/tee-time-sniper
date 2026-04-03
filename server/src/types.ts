@@ -5,6 +5,7 @@ export interface TeeTimeSlot {
   price: number;
   bookingUrl: string;
   platform: string;
+  holes: number;
 }
 
 export interface DateRange {
@@ -29,6 +30,7 @@ export interface Preference {
   latest_time: string;   // HH:MM:SS
   num_players: number;
   look_ahead_days: number;
+  holes: number; // 0 = both, 9 = 9 holes only, 18 = 18 holes only
   active: boolean;
 }
 
@@ -48,4 +50,5 @@ export interface MatchedTeeTime {
   players_available: number;
   price: number;
   booking_url: string;
+  holes: number;
 }

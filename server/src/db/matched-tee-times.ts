@@ -10,6 +10,7 @@ export interface MatchedTeeTimeRow {
   players_available: number;
   price: number;
   booking_url: string;
+  holes: number;
 }
 
 export interface InsertMatchedTeeTime {
@@ -21,6 +22,7 @@ export interface InsertMatchedTeeTime {
   players_available: number;
   price: number;
   booking_url: string;
+  holes: number;
 }
 
 export async function getMatchedTeeTimes(preferenceId: string): Promise<MatchedTeeTimeRow[]> {

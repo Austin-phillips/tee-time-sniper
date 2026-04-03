@@ -71,8 +71,6 @@ export class ChronogolfScraper extends BaseScraper {
     const params = new URLSearchParams();
     params.set('date', dateStr);
     params.append('affiliation_type_ids[]', String(affiliationTypeId));
-    params.set('nb_holes', '18');
-
     const url = `https://www.chronogolf.com/marketplace/clubs/${clubId}/teetimes?${params}`;
 
     const response = await this.fetchWithTimeout(url, {
@@ -108,8 +106,9 @@ export class ChronogolfScraper extends BaseScraper {
         dateTime,
         numPlayersAvailable: 4,
         price,
-        bookingUrl: `${courseUrl}#?date=${item.date}&course_id=${item.course_id}&nb_holes=18`,
+        bookingUrl: `${courseUrl}#?date=${item.date}&course_id=${item.course_id}&nb_holes=${item.hole}`,
         platform: 'chronogolf',
+        holes: item.hole,
       });
     }
 

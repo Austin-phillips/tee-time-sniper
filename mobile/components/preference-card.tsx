@@ -20,6 +20,7 @@ interface Preference {
   latest_time: string;
   num_players: number;
   look_ahead_days: number;
+  holes: number;
   active: boolean;
 }
 
@@ -110,6 +111,14 @@ export function PreferenceCard({
             Players
           </Text>
           <Text className="text-sm font-medium">{preference.num_players}</Text>
+        </View>
+        <View className="w-1/2">
+          <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+            Holes
+          </Text>
+          <Text className="text-sm font-medium">
+            {preference.holes === 0 ? "Both" : `${preference.holes} holes`}
+          </Text>
         </View>
         <View className="w-1/2">
           <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">

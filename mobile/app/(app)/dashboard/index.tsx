@@ -20,6 +20,7 @@ interface Preference {
   latest_time: string;
   num_players: number;
   look_ahead_days: number;
+  holes: number;
   active: boolean;
 }
 

@@ -26,6 +26,7 @@ interface PreferenceData {
   latest_time: string;
   num_players: number;
   look_ahead_days: number;
+  holes: number;
   active: boolean;
 }
 
@@ -44,6 +45,11 @@ function dateToTimeString(date: Date): string {
 
 const PLAYER_OPTIONS = [1, 2, 3, 4];
 const LOOK_AHEAD_OPTIONS = [3, 5, 7, 14];
+const HOLES_OPTIONS = [
+  { value: 0, label: "Both" },
+  { value: 9, label: "9" },
+  { value: 18, label: "18" },
+];
 
 export function PreferenceForm({
   courses,
@@ -71,6 +77,7 @@ export function PreferenceForm({
   const [lookAheadDays, setLookAheadDays] = useState(
     initial?.look_ahead_days ?? 7
   );
+  const [holes, setHoles] = useState(initial?.holes ?? 0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -96,6 +103,7 @@ export function PreferenceForm({
       latest_time: dateToTimeString(latestTime) + ":00",
       num_players: numPlayers,
       look_ahead_days: lookAheadDays,
+      holes,
       active: true,
     };
 
@@ -210,7 +218,38 @@ export function PreferenceForm({
           </View>
         </View>
 
-        {/* Card 5: Look-Ahead Days */}
+        {/* Card 5: Holes */}
+        <View className="rounded-2xl bg-white p-5 shadow-sm mt-4">
+          <Text className="text-sm font-medium mb-2">Holes</Text>
+          <View className="flex-row gap-2">
+            {HOLES_OPTIONS.map((opt) => {
+              const isSelected = holes === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setHoles(opt.value)}
+                  className={`h-10 flex-1 items-center justify-center rounded-lg border ${
+                    isSelected
+                      ? "border-primary bg-primary"
+                      : "border-border bg-white"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      isSelected
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Card 6: Look-Ahead Days */}
         <View className="rounded-2xl bg-white p-5 shadow-sm mt-4">
           <Text className="text-sm font-medium mb-2">Look-Ahead Days</Text>
           <View className="flex-row gap-2">

@@ -19,6 +19,7 @@ interface MatchedTeeTime {
   players_available: number;
   price: number;
   booking_url: string;
+  holes: number;
 }
 
 interface Section {
@@ -134,6 +135,9 @@ export default function TeeTimesScreen() {
               <Text className="text-sm text-muted-foreground">
                 {item.players_available}{" "}
                 {item.players_available === 1 ? "player" : "players"}
+              </Text>
+              <Text className="text-sm text-muted-foreground">
+                {item.holes}h
               </Text>
               {item.price > 0 && (
                 <Text className="text-sm text-muted-foreground">

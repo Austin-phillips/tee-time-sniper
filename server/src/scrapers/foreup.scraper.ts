@@ -42,7 +42,7 @@ export class ForeupScraper extends BaseScraper {
         const url = new URL(`${baseUrl}/index.php/api/booking/times`);
         url.searchParams.set('date', dateStr);
         url.searchParams.set('time', 'all');
-        url.searchParams.set('holes', '18');
+        url.searchParams.set('holes', 'all');
         url.searchParams.set('players', numPlayers.toString());
         url.searchParams.set('booking_class', bookingClass);
         url.searchParams.set('schedule_id', scheduleId);
@@ -74,19 +74,36 @@ export class ForeupScraper extends BaseScraper {
         }
 
         for (const item of data as ForeupApiResponse[]) {
-          const available = item.available_spots ?? item.available_spots_18 ?? 0;
-          if (available < numPlayers) continue;
-
           const teeDateTime = new Date(item.time);
           const bookingDate = this.formatDate(teeDateTime);
-          slots.push({
-            courseId: courseId,
-            dateTime: teeDateTime,
-            numPlayersAvailable: available,
-            price: item.green_fee_18 ?? item.green_fee ?? 0,
-            bookingUrl: `${baseUrl}/index.php/booking/${courseId}/${scheduleId}#/teetimes?date=${bookingDate}&time=all&holes=18&players=${numPlayers}`,
-            platform: 'foreup',
-          });
+
+          // Emit 18-hole slot if available
+          const available18 = item.available_spots_18 ?? item.available_spots ?? 0;
+          if (available18 >= numPlayers) {
+            slots.push({
+              courseId: courseId,
+              dateTime: teeDateTime,
+              numPlayersAvailable: available18,
+              price: item.green_fee_18 ?? item.green_fee ?? 0,
+              bookingUrl: `${baseUrl}/index.php/booking/${courseId}/${scheduleId}#/teetimes?date=${bookingDate}&time=all&holes=18&players=${numPlayers}`,
+              platform: 'foreup',
+              holes: 18,
+            });
+          }
+
+          // Emit 9-hole slot if available
+          const available9 = item.available_spots_9 ?? 0;
+          if (available9 >= numPlayers) {
+            slots.push({
+              courseId: courseId,
+              dateTime: teeDateTime,
+              numPlayersAvailable: available9,
+              price: item.green_fee_9 ?? item.green_fee ?? 0,
+              bookingUrl: `${baseUrl}/index.php/booking/${courseId}/${scheduleId}#/teetimes?date=${bookingDate}&time=all&holes=9&players=${numPlayers}`,
+              platform: 'foreup',
+              holes: 9,
+            });
+          }
         }
       } catch (err) {
         console.error(`Error fetching foreUP slots for ${dateStr}:`, err);
@@ -114,14 +131,16 @@ export class ForeupScraper extends BaseScraper {
       if (!response.ok) return 'false';
 
       const html = await response.text();
-      const match = html.match(/"booking_classes":\[([^\]]*)\]/);
-      if (!match) return 'false';
-
-      const classes = JSON.parse(`[${match[1]}]`) as { booking_class_id: string; active: string; block_online_booking: string }[];
-      const active = classes.find((c) => c.active === '1' && c.block_online_booking === '0');
-      if (active) {
-        console.log(`  Auto-detected booking_class=${active.booking_class_id} for course ${courseId}`);
-        return active.booking_class_id;
+      // Extract booking_class_id, active, and block_online_booking from each class object
+      // Using individual field extraction to avoid nested JSON parsing issues
+      const classRegex = /"booking_class_id":"(\d+)"[^}]*?"active":"([01])"[^}]*?"block_online_booking":"([01])"/g;
+      let classMatch;
+      while ((classMatch = classRegex.exec(html)) !== null) {
+        const [, classId, isActive, isBlocked] = classMatch;
+        if (isActive === '1' && isBlocked === '0') {
+          console.log(`  Auto-detected booking_class=${classId} for course ${courseId}`);
+          return classId;
+        }
       }
     } catch (err) {
       console.warn(`Failed to auto-detect booking class for course ${courseId}:`, err);
