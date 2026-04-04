@@ -31,15 +31,6 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications/index"
-        options={{
-          title: "Notifications",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="reader-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile/index"
         options={{
           title: "Profile",
@@ -50,12 +41,12 @@ export default function AppLayout() {
       />
       {/* Hidden from tabs */}
       <Tabs.Screen
-        name="notifications/[id]"
+        name="tee-times/[date]"
         options={{
           href: null,
-          title: "Tee Times Found",
+          title: "Tee Times",
           headerLeft: () => (
-            <Pressable onPress={() => router.navigate("/notifications")} style={{ marginLeft: 12 }}>
+            <Pressable onPress={() => router.navigate("/tee-times")} style={{ marginLeft: 12 }}>
               <Ionicons name="arrow-back" size={24} color="#16a34a" />
             </Pressable>
           ),

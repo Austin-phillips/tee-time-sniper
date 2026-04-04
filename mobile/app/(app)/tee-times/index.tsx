@@ -6,9 +6,8 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Linking,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 
@@ -22,13 +21,51 @@ interface MatchedTeeTime {
   holes: number;
 }
 
-interface Section {
+interface CourseSummary {
+  courseName: string;
+  date: string;
+  timeRange: string;
+  count: number;
+  priceRange: string;
+  holes: number;
+}
+
+interface DateSection {
   title: string;
-  data: MatchedTeeTime[];
+  date: string;
+  data: CourseSummary[];
+}
+
+function formatDateHeader(dateStr: string): string {
+  const date = new Date(dateStr + "T12:00:00");
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatPriceRange(prices: number[]): string {
+  const validPrices = prices.filter((p) => p > 0);
+  if (validPrices.length === 0) return "";
+  const min = Math.min(...validPrices);
+  const max = Math.max(...validPrices);
+  if (min === max) return `$${min}`;
+  return `$${min} - $${max}`;
 }
 
 export default function TeeTimesScreen() {
-  const [sections, setSections] = useState<Section[]>([]);
+  const router = useRouter();
+  const [sections, setSections] = useState<DateSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -39,17 +76,45 @@ export default function TeeTimesScreen() {
       .gte("tee_time", new Date().toISOString())
       .order("tee_time", { ascending: true });
 
-    // Group by course_name
-    const grouped = new Map<string, MatchedTeeTime[]>();
+    // Group by date, then by course
+    const byDateCourse = new Map<string, Map<string, MatchedTeeTime[]>>();
     for (const item of data ?? []) {
-      const group = grouped.get(item.course_name) ?? [];
-      group.push(item);
-      grouped.set(item.course_name, group);
+      const dateKey = item.tee_time.split("T")[0];
+      if (!byDateCourse.has(dateKey)) {
+        byDateCourse.set(dateKey, new Map());
+      }
+      const courseMap = byDateCourse.get(dateKey)!;
+      const list = courseMap.get(item.course_name) ?? [];
+      list.push(item);
+      courseMap.set(item.course_name, list);
     }
 
-    const sectionData: Section[] = [];
-    for (const [title, items] of grouped) {
-      sectionData.push({ title, data: items });
+    const sectionData: DateSection[] = [];
+    const sortedDates = [...byDateCourse.keys()].sort();
+
+    for (const dateKey of sortedDates) {
+      const courseMap = byDateCourse.get(dateKey)!;
+      const summaries: CourseSummary[] = [];
+
+      for (const [courseName, times] of courseMap) {
+        const sorted = times.sort(
+          (a, b) => new Date(a.tee_time).getTime() - new Date(b.tee_time).getTime()
+        );
+        summaries.push({
+          courseName,
+          date: dateKey,
+          timeRange: `${formatTime(sorted[0].tee_time)} - ${formatTime(sorted[sorted.length - 1].tee_time)}`,
+          count: times.length,
+          priceRange: formatPriceRange(times.map((t) => t.price)),
+          holes: times[0].holes,
+        });
+      }
+
+      sectionData.push({
+        title: formatDateHeader(dateKey),
+        date: dateKey,
+        data: summaries,
+      });
     }
 
     setSections(sectionData);
@@ -68,18 +133,6 @@ export default function TeeTimesScreen() {
     fetchTeeTimes();
   }
 
-  function formatDateTime(isoString: string) {
-    const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -92,7 +145,7 @@ export default function TeeTimesScreen() {
     <View className="flex-1 bg-gray-50">
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => `${item.date}-${item.courseName}`}
         contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         refreshControl={
           <RefreshControl
@@ -105,7 +158,7 @@ export default function TeeTimesScreen() {
           <View className="mb-5">
             <Text className="text-2xl font-bold">Tee Times</Text>
             <Text className="text-sm text-muted-foreground mt-0.5">
-              Currently available matching tee times
+              Available tee times by date
             </Text>
           </View>
         }
@@ -122,36 +175,63 @@ export default function TeeTimesScreen() {
           </View>
         }
         renderSectionHeader={({ section: { title } }) => (
-          <View className="bg-gray-50 py-2 mt-2">
+          <View className="bg-gray-50 pt-4 pb-2">
             <Text className="text-lg font-bold text-gray-800">{title}</Text>
           </View>
         )}
         renderItem={({ item }) => (
-          <View className="rounded-2xl bg-white p-4 shadow-sm mb-3">
-            <Text className="text-base font-semibold">
-              {formatDateTime(item.tee_time)}
-            </Text>
-            <View className="flex-row items-center mt-2 gap-3">
-              <Text className="text-sm text-muted-foreground">
-                {item.players_available}{" "}
-                {item.players_available === 1 ? "player" : "players"}
-              </Text>
-              <Text className="text-sm text-muted-foreground">
-                {item.holes}h
-              </Text>
-              {item.price > 0 && (
-                <Text className="text-sm text-muted-foreground">
-                  ${Number(item.price).toFixed(2)}
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/tee-times/[date]",
+                params: { date: item.date, courseName: item.courseName },
+              })
+            }
+          >
+            <View className="rounded-2xl bg-white p-4 shadow-sm mb-3">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-base font-semibold flex-1">
+                  {item.courseName}
                 </Text>
-              )}
+                <View className="bg-green-100 rounded-full px-2.5 py-0.5">
+                  <Text className="text-xs font-medium text-green-700">
+                    {item.holes}h
+                  </Text>
+                </View>
+              </View>
+              <View className="flex-row items-center mt-2 gap-3">
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="time-outline" size={14} color="#6b7280" />
+                  <Text className="text-sm text-muted-foreground">
+                    {item.timeRange}
+                  </Text>
+                </View>
+              </View>
+              <View className="flex-row items-center mt-1.5 gap-3">
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+                  <Text className="text-sm text-muted-foreground">
+                    {item.count} tee time{item.count !== 1 ? "s" : ""}
+                  </Text>
+                </View>
+                {item.priceRange !== "" && (
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={14}
+                      color="#6b7280"
+                    />
+                    <Text className="text-sm text-muted-foreground">
+                      {item.priceRange}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View className="flex-row items-center justify-end mt-1">
+                <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+              </View>
             </View>
-            <Pressable
-              onPress={() => Linking.openURL(item.booking_url)}
-              className="bg-primary rounded-lg py-2.5 mt-3 items-center"
-            >
-              <Text className="text-sm font-semibold text-white">Book Now</Text>
-            </Pressable>
-          </View>
+          </Pressable>
         )}
       />
     </View>

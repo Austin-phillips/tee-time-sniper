@@ -18,44 +18,49 @@ interface MatchedTeeTime {
   players_available: number;
   price: number;
   booking_url: string;
+  holes: number;
 }
 
-export default function NotificationDetailScreen() {
-  const { courseName } = useLocalSearchParams<{ courseName: string }>();
+function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export default function TeeTimeDateDetailScreen() {
+  const { date, courseName } = useLocalSearchParams<{
+    date: string;
+    courseName: string;
+  }>();
   const [teeTimes, setTeeTimes] = useState<MatchedTeeTime[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchTeeTimes = useCallback(async () => {
-    if (!courseName) return;
+    if (!date || !courseName) return;
+
+    const startOfDay = `${date}T00:00:00`;
+    const endOfDay = `${date}T23:59:59`;
 
     const { data } = await supabase
       .from("matched_tee_times")
       .select("*")
       .eq("course_name", courseName)
-      .gte("tee_time", new Date().toISOString())
+      .gte("tee_time", startOfDay)
+      .lte("tee_time", endOfDay)
       .order("tee_time", { ascending: true });
 
     setTeeTimes(data ?? []);
     setLoading(false);
-  }, [courseName]);
+  }, [date, courseName]);
 
   useFocusEffect(
     useCallback(() => {
       fetchTeeTimes();
     }, [fetchTeeTimes])
   );
-
-  function formatDateTime(isoString: string) {
-    const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }
 
   if (loading) {
     return (
@@ -75,7 +80,8 @@ export default function NotificationDetailScreen() {
           <View className="mb-5">
             <Text className="text-2xl font-bold">{courseName}</Text>
             <Text className="text-sm text-muted-foreground mt-0.5">
-              {teeTimes.length} available tee time{teeTimes.length !== 1 ? "s" : ""}
+              {teeTimes.length} available tee time
+              {teeTimes.length !== 1 ? "s" : ""}
             </Text>
           </View>
         }
@@ -93,12 +99,15 @@ export default function NotificationDetailScreen() {
         renderItem={({ item }) => (
           <View className="rounded-2xl bg-white p-4 shadow-sm mb-3">
             <Text className="text-base font-semibold">
-              {formatDateTime(item.tee_time)}
+              {formatTime(item.tee_time)}
             </Text>
             <View className="flex-row items-center mt-2 gap-3">
               <Text className="text-sm text-muted-foreground">
                 {item.players_available}{" "}
                 {item.players_available === 1 ? "player" : "players"}
+              </Text>
+              <Text className="text-sm text-muted-foreground">
+                {item.holes}h
               </Text>
               {item.price > 0 && (
                 <Text className="text-sm text-muted-foreground">

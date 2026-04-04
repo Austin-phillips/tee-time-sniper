@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Slot } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Slot, useRouter, useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -32,6 +32,30 @@ function PushRegistration() {
   return null;
 }
 
+function NotificationNavigator() {
+  const router = useRouter();
+  const navigationRef = useNavigationContainerRef();
+  const responseListener = useRef<Notifications.Subscription>();
+
+  useEffect(() => {
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener(() => {
+        // Wait for navigation to be ready before navigating
+        if (navigationRef.isReady()) {
+          router.navigate("/tee-times");
+        }
+      });
+
+    return () => {
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, [router, navigationRef]);
+
+  return null;
+}
+
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
@@ -40,6 +64,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <PushRegistration />
+      <NotificationNavigator />
       <Slot />
     </AuthProvider>
   );
