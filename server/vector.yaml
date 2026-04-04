@@ -1,0 +1,17 @@
+sources:
+  tee_time_sniper:
+    type: journald
+    include_units:
+      - tee-time-sniper
+
+sinks:
+  betterstack:
+    type: http
+    inputs:
+      - tee_time_sniper
+    uri: https://in.logs.betterstack.com
+    method: post
+    encoding:
+      codec: json
+    headers:
+      Authorization: Bearer Rp6Y66PZkV3dMQR81JEayFTB

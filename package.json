@@ -5,6 +5,11 @@
   "scripts": {
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
-    "db:status": "supabase migration list"
+    "db:status": "supabase migration list",
+    "pi:ssh": "ssh austin@192.168.4.95",
+    "pi:deploy": "ssh austin@192.168.4.95 'cd ~/tee-time-sniper && git pull && cd server && npm install && npm run build && sudo systemctl restart tee-time-sniper'",
+    "pi:logs": "ssh austin@192.168.4.95 'journalctl -u tee-time-sniper -f'",
+    "pi:stop": "ssh austin@192.168.4.95 'sudo systemctl stop tee-time-sniper'",
+    "pi:start": "ssh austin@192.168.4.95 'sudo systemctl start tee-time-sniper'"
   }
 }
