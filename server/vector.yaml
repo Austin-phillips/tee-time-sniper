@@ -4,11 +4,22 @@ sources:
     include_units:
       - tee-time-sniper
 
+transforms:
+  parse_pino:
+    type: remap
+    inputs:
+      - tee_time_sniper
+    source: |
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., parsed)
+      }
+
 sinks:
   betterstack:
     type: http
     inputs:
-      - tee_time_sniper
+      - parse_pino
     uri: https://in.logs.betterstack.com
     method: post
     encoding:
