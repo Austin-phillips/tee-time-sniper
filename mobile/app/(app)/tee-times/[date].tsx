@@ -41,6 +41,9 @@ export default function TeeTimeDateDetailScreen() {
   const fetchTeeTimes = useCallback(async () => {
     if (!date || !courseName) return;
 
+    setTeeTimes([]);
+    setLoading(true);
+
     const startOfDay = `${date}T00:00:00`;
     const endOfDay = `${date}T23:59:59`;
 
