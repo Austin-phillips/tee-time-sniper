@@ -1,5 +1,8 @@
 import { getPushTokens } from '../db/push-tokens';
 import { saveNotification } from '../db/notifications';
+import logger from '../logger';
+
+const log = logger.child({ module: 'push' });
 
 export async function sendBatchPushNotification(
   userId: string,
@@ -30,12 +33,12 @@ export async function sendBatchPushNotification(
 
     if (!response.ok) {
       const text = await response.text();
-      console.error(`Expo push API error: ${response.status} ${text}`);
+      log.error({ userId, status: response.status, responseBody: text }, 'Expo push API error');
     } else {
-      console.log(`Push sent to ${tokens.length} device(s) for user ${userId} — ${title}: ${body}`);
+      log.info({ userId, tokenCount: tokens.length, title, body }, 'Push sent');
     }
   } else {
-    console.warn(`No push tokens for user ${userId}, skipping push (notification still saved)`);
+    log.warn({ userId }, 'No push tokens, skipping push (notification still saved)');
   }
 
   await saveNotification(userId, courseName, title, body);

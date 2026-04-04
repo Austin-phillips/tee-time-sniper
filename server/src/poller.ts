@@ -14,6 +14,9 @@ import { GolfnowScraper } from './scrapers/golfnow.scraper';
 import { ChronogolfScraper } from './scrapers/chronogolf.scraper';
 import { CustomScraper } from './scrapers/custom.scraper';
 import { TeeTimeSlot, Course, Preference } from './types';
+import logger from './logger';
+
+const log = logger.child({ module: 'poller' });
 
 const COURSE_CONCURRENCY = 5;
 
@@ -57,11 +60,11 @@ async function runWithConcurrency<T>(
 }
 
 export async function pollForTeeTimesOnce(): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Starting poll run...`);
+  log.info('Starting poll run');
 
   // 1. Fetch all active preferences
   const preferences = await getActivePreferences();
-  console.log(`Found ${preferences.length} active preferences`);
+  log.info({ prefCount: preferences.length }, 'Found active preferences');
 
   if (preferences.length === 0) return;
 
@@ -85,7 +88,7 @@ export async function pollForTeeTimesOnce(): Promise<void> {
   const scrapeTasks = courseEntries.map(([courseId, coursePrefs]) => async () => {
     const course = courseMap.get(courseId);
     if (!course) {
-      console.error(`Course ${courseId} not found, skipping`);
+      log.error({ courseId }, 'Course not found, skipping');
       return;
     }
 
@@ -111,19 +114,19 @@ export async function pollForTeeTimesOnce(): Promise<void> {
       );
 
       if (slots.length > 0) {
-        console.log(`  ${course.name}: scraped ${slots.length} available tee times`);
+        log.info({ courseId, courseName: course.name, slotCount: slots.length }, 'Scraped available tee times');
         for (const slot of slots) {
           const dt = slot.dateTime;
           const day = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const time = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           const price = slot.price > 0 ? ` | $${slot.price}` : '';
-          console.log(`    ${day} at ${time} — ${slot.numPlayersAvailable} players | ${slot.holes}h${price}`);
+          log.info(`    ${day} at ${time} — ${slot.numPlayersAvailable} players | ${slot.holes}h${price}`);
         }
       } else {
-        console.log(`  ${course.name}: no available tee times found`);
+        log.info({ courseId, courseName: course.name }, 'No available tee times found');
       }
     } catch (err) {
-      console.error(`Error scraping course ${course.name}:`, err);
+      log.error({ err, courseId, courseName: course.name }, 'Error scraping course');
     }
   });
 
@@ -168,9 +171,15 @@ export async function pollForTeeTimesOnce(): Promise<void> {
       }
 
       if (matchingSlots.length > 0) {
-        console.log(`  Preference ${pref.id} (${course.name}): ${matchingSlots.length} slots match filters`);
+        log.info(
+          { prefId: pref.id, courseName: course.name, slotCount: matchingSlots.length },
+          'Slots match filters'
+        );
       } else {
-        console.log(`  Preference ${pref.id} (${course.name}): no slots match filters (days=${JSON.stringify(pref.days_of_week)}, time=${pref.earliest_time}-${pref.latest_time}, players=${pref.num_players})`);
+        log.info(
+          { prefId: pref.id, courseName: course.name, days: pref.days_of_week, timeRange: `${pref.earliest_time}-${pref.latest_time}`, players: pref.num_players },
+          'No slots match filters'
+        );
       }
 
       const existing = await getMatchedTeeTimes(pref.id);
@@ -192,12 +201,12 @@ export async function pollForTeeTimesOnce(): Promise<void> {
         .map((row) => row.id);
 
       if (newSlots.length > 0) {
-        console.log(`    ${newSlots.length} NEW tee times for ${course.name}:`);
+        log.info({ newCount: newSlots.length, courseName: course.name }, 'New tee times found');
         for (const slot of newSlots) {
           const dt = slot.dateTime;
           const day = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const time = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-          console.log(`      ${day} at ${time}`);
+          log.info(`      ${day} at ${time}`);
         }
         const rows: InsertMatchedTeeTime[] = newSlots.map((slot) => ({
           user_id: pref.user_id,
@@ -214,7 +223,7 @@ export async function pollForTeeTimesOnce(): Promise<void> {
       }
 
       if (staleIds.length > 0) {
-        console.log(`    ${staleIds.length} stale tee times removed for ${course.name}`);
+        log.info({ staleCount: staleIds.length, courseName: course.name }, 'Stale tee times removed');
         await deleteMatchedTeeTimes(staleIds);
       }
 
@@ -231,7 +240,7 @@ export async function pollForTeeTimesOnce(): Promise<void> {
         }
       }
     } catch (err) {
-      console.error(`Error processing preference ${pref.id}:`, err);
+      log.error({ err, prefId: pref.id }, 'Error processing preference');
     }
   }
 
@@ -241,9 +250,9 @@ export async function pollForTeeTimesOnce(): Promise<void> {
     try {
       await sendBatchPushNotification(userId, courseName, count);
     } catch (err) {
-      console.error(`Push notification failed for ${key}:`, err);
+      log.error({ err, userId, courseName }, 'Push notification failed');
     }
   }
 
-  console.log(`[${new Date().toISOString()}] Poll run complete.`);
+  log.info('Poll run complete');
 }

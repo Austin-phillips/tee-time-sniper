@@ -1,5 +1,8 @@
 import { BaseScraper } from './base.scraper';
 import { TeeTimeSlot, DateRange } from '../types';
+import logger from '../logger';
+
+const log = logger.child({ module: 'foreup-scraper' });
 
 /**
  * foreUP scraper — uses the public booking widget API at /index.php/api/booking/times
@@ -59,7 +62,7 @@ export class ForeupScraper extends BaseScraper {
         });
 
         if (!response.ok) {
-          console.warn(`foreUP API returned ${response.status} for ${dateStr}`);
+          log.warn({ dateStr, courseId, status: response.status }, 'foreUP API returned non-OK status');
           currentDate.setDate(currentDate.getDate() + 1);
           continue;
         }
@@ -68,7 +71,7 @@ export class ForeupScraper extends BaseScraper {
 
         // API returns `false` for invalid course/schedule combos
         if (!Array.isArray(data)) {
-          console.warn(`foreUP returned non-array for ${dateStr} (schedule ${scheduleId})`);
+          log.warn({ dateStr, courseId, scheduleId }, 'foreUP returned non-array response');
           currentDate.setDate(currentDate.getDate() + 1);
           continue;
         }
@@ -106,7 +109,7 @@ export class ForeupScraper extends BaseScraper {
           }
         }
       } catch (err) {
-        console.error(`Error fetching foreUP slots for ${dateStr}:`, err);
+        log.error({ err, dateStr, courseId }, 'Error fetching foreUP slots');
       }
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -138,12 +141,12 @@ export class ForeupScraper extends BaseScraper {
       while ((classMatch = classRegex.exec(html)) !== null) {
         const [, classId, isActive, isBlocked] = classMatch;
         if (isActive === '1' && isBlocked === '0') {
-          console.log(`  Auto-detected booking_class=${classId} for course ${courseId}`);
+          log.info({ courseId, bookingClass: classId }, 'Auto-detected booking class');
           return classId;
         }
       }
     } catch (err) {
-      console.warn(`Failed to auto-detect booking class for course ${courseId}:`, err);
+      log.warn({ err, courseId }, 'Failed to auto-detect booking class');
     }
     return 'false';
   }

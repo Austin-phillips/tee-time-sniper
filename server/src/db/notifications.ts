@@ -1,4 +1,7 @@
 import { supabaseAdmin } from './client';
+import logger from '../logger';
+
+const log = logger.child({ module: 'notifications' });
 
 export async function saveNotification(
   userId: string,
@@ -15,9 +18,9 @@ export async function saveNotification(
     });
 
     if (error) {
-      console.error(`Failed to save notification for user ${userId}:`, error.message);
+      log.error({ userId, err: error.message }, 'Failed to save notification');
     }
   } catch (err) {
-    console.error(`Failed to save notification for user ${userId}:`, err);
+    log.error({ userId, err }, 'Failed to save notification');
   }
 }

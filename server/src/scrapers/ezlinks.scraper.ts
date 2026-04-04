@@ -1,5 +1,8 @@
 import { BaseScraper } from './base.scraper';
 import { TeeTimeSlot, DateRange } from '../types';
+import logger from '../logger';
+
+const log = logger.child({ module: 'ezlinks-scraper' });
 
 /**
  * EZLinks scraper — used by some Salt Lake County courses
@@ -18,7 +21,7 @@ export class EzlinksScraper extends BaseScraper {
   ): Promise<TeeTimeSlot[]> {
     // TODO: Implement EZLinks scraper using Playwright
     // EZLinks sites typically require browser automation
-    console.warn('EZLinks scraper not yet implemented');
+    log.warn('EZLinks scraper not yet implemented');
     return [];
   }
 }

@@ -1,5 +1,8 @@
 import { BaseScraper } from './base.scraper';
 import { TeeTimeSlot, DateRange } from '../types';
+import logger from '../logger';
+
+const log = logger.child({ module: 'chronogolf-scraper' });
 
 /**
  * Chronogolf (Lightspeed Golf) scraper
@@ -51,7 +54,7 @@ export class ChronogolfScraper extends BaseScraper {
         const daySlots = await this.fetchDate(clubId!, affiliationTypeId!, dateStr, courseUrl);
         slots.push(...daySlots);
       } catch (err) {
-        console.error(`Error fetching Chronogolf slots for ${dateStr}:`, err);
+        log.error({ err, dateStr }, 'Error fetching Chronogolf slots');
       }
       currentDate.setDate(currentDate.getDate() + 1);
 
@@ -86,7 +89,7 @@ export class ChronogolfScraper extends BaseScraper {
     });
 
     if (!response.ok) {
-      console.warn(`Chronogolf API returned ${response.status} for ${dateStr}`);
+      log.warn({ dateStr, status: response.status }, 'Chronogolf API returned non-OK status');
       return [];
     }
 

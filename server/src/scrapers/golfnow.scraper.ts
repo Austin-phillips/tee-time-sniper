@@ -1,5 +1,8 @@
 import { BaseScraper } from './base.scraper';
 import { TeeTimeSlot, DateRange } from '../types';
+import logger from '../logger';
+
+const log = logger.child({ module: 'golfnow-scraper' });
 
 /**
  * GolfNow scraper — aggregator used by some private/resort courses
@@ -17,7 +20,7 @@ export class GolfnowScraper extends BaseScraper {
   ): Promise<TeeTimeSlot[]> {
     // TODO: Implement GolfNow scraper
     // GolfNow has an internal API that can be reverse-engineered from their booking flow
-    console.warn('GolfNow scraper not yet implemented');
+    log.warn('GolfNow scraper not yet implemented');
     return [];
   }
 }
