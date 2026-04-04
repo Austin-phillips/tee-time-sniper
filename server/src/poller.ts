@@ -140,9 +140,11 @@ export async function pollForTeeTimesOnce(): Promise<void> {
       if (!course) continue;
 
       const allSlots = slotsByCourse.get(pref.course_id) ?? [];
+      const now = new Date();
 
       const filteredSlots = allSlots.filter(
         (slot) =>
+          slot.dateTime > now &&
           slot.numPlayersAvailable >= pref.num_players &&
           isDayMatch(slot.dateTime, pref.days_of_week) &&
           isTimeInWindow(slot.dateTime, pref.earliest_time, pref.latest_time) &&
